@@ -175,15 +175,20 @@ def pares_conectados(g: nx.Graph) -> int:
 
 
 def pares_incomunicados(original: nx.Graph, simulada: nx.Graph) -> list[tuple[str, str]]:
+    """Pares de dispositivos ACTIVOS que estaban comunicados en la red base y ya no.
+
+    Los dispositivos caídos se excluyen: un equipo apagado no se comunica con nadie
+    y eso ya se sabe, así que contarlo solo infla el número y contradice el estado
+    de la red activa. Solo cuentan los pares donde ambos extremos siguen encendidos
+    pero ya no tienen camino entre sí (por la caída de otros equipos o de enlaces).
+    """
     comp_orig = {n: i for i, c in enumerate(nx.connected_components(original)) for n in c}
     comp_sim = {n: i for i, c in enumerate(nx.connected_components(simulada)) for n in c}
-    nodos = list(original.nodes())
+    activos = [n for n in original.nodes() if n in simulada]
     out = []
-    for i, a in enumerate(nodos):
-        for b in nodos[i + 1:]:
-            antes = comp_orig[a] == comp_orig[b]
-            despues = a in comp_sim and b in comp_sim and comp_sim[a] == comp_sim[b]
-            if antes and not despues:
+    for i, a in enumerate(activos):
+        for b in activos[i + 1:]:
+            if comp_orig[a] == comp_orig[b] and comp_sim[a] != comp_sim[b]:
                 out.append((a, b))
     return out
 
