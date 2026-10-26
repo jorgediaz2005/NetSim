@@ -105,6 +105,24 @@ def _peor_caso():
         st.session_state.sel_fallos = [df.iloc[0]["Dispositivo"]]
 
 
+# Los cambios de red se hacen en callbacks: así se ejecutan ANTES de dibujar los
+# selectores de fallos y Streamlit permite modificar su estado.
+def _cargar_plantilla():
+    cambiar_red(PLANTILLAS[st.session_state.plantilla_sel]())
+
+
+def _importar():
+    archivo = st.session_state.get("archivo_json")
+    if archivo is None:
+        st.session_state.msg_import = ("error", "Primero selecciona un archivo JSON.")
+        return
+    try:
+        cambiar_red(core.red_desde_dict(json.load(archivo)))
+        st.session_state.msg_import = ("ok", "Topología importada correctamente.")
+    except Exception as e:  # noqa: BLE001
+        st.session_state.msg_import = ("error", f"No se pudo importar el archivo: {e}")
+
+
 # =========================================================
 # BARRA LATERAL
 # =========================================================
@@ -128,10 +146,10 @@ with st.sidebar:
     st.markdown("### 🏗️ Construir red")
 
     with st.expander("📐 Plantillas de topología"):
-        plantilla = st.selectbox("Plantilla", list(PLANTILLAS), key="plantilla_sel")
-        if st.button("Cargar plantilla", use_container_width=True):
-            cambiar_red(PLANTILLAS[plantilla]())
-            st.rerun()
+        st.selectbox("Plantilla (se carga al elegirla)", list(PLANTILLAS), key="plantilla_sel",
+                     on_change=_cargar_plantilla)
+        st.button("Recargar plantilla", on_click=_cargar_plantilla, use_container_width=True,
+                  help="Vuelve a cargar la plantilla elegida, descartando los cambios hechos")
 
     with st.expander("➕ Añadir dispositivo"):
         with st.form("agregar_dispositivo", clear_on_submit=True):
@@ -183,11 +201,6 @@ with st.sidebar:
                 st.session_state.posiciones = None
                 st.rerun()
 
-    with st.expander("♻️ Restablecer"):
-        if st.button("Volver a la red inicial", use_container_width=True):
-            cambiar_red(core.crear_red_inicial())
-            st.rerun()
-
     st.divider()
     st.markdown("### 🎨 Vista")
     layout_nombre = st.selectbox("Disposición del mapa",
@@ -213,7 +226,8 @@ pares_perdidos = core.pares_incomunicados(G, G_sim) if G.number_of_nodes() else 
 # ---- ruta actual (se calcula antes de dibujar el mapa) ----
 def ruta_actual():
     o, d = st.session_state.get("ruta_origen"), st.session_state.get("ruta_destino")
-    if o in G_sim and d in G_sim and o != d and nx.has_path(G_sim, o, d):
+    if o is not None and d is not None and o in G_sim and d in G_sim and o != d \
+            and nx.has_path(G_sim, o, d):
         r = nx.shortest_path(G_sim, o, d, weight="weight")
         return r, nx.shortest_path_length(G_sim, o, d, weight="weight")
     return [], None
@@ -365,12 +379,12 @@ with tab_red:
                 st.write(f"**Grupo {i}:** " + ", ".join(sorted(comp)))
     with c2:
         if pares_perdidos:
-            st.warning(f"El escenario incomunica {len(pares_perdidos)} pares que estaban conectados en la base.")
+            st.warning(f"El escenario deja sin comunicación a {len(pares_perdidos)} pares de dispositivos activos que estaban conectados en la base.")
             with st.expander("Ver pares afectados"):
                 st.dataframe(pd.DataFrame(pares_perdidos, columns=["Origen", "Destino"]),
                              use_container_width=True, hide_index=True)
         else:
-            st.success("No se pierde comunicación entre pares previamente conectados.")
+            st.success("Los dispositivos activos siguen comunicados entre sí como en la base.")
 
 # ---------------------------------------------------------
 with tab_rutas:
@@ -379,15 +393,19 @@ with tab_rutas:
     if len(activos) < 2:
         st.info("Se necesitan al menos dos dispositivos activos.")
     else:
-        if st.session_state.get("ruta_origen") not in activos:
-            st.session_state.ruta_origen = activos[0]
-        if st.session_state.get("ruta_destino") not in activos:
-            st.session_state.ruta_destino = activos[-1]
+        opciones_ruta = [None] + activos
+        for k_ruta in ("ruta_origen", "ruta_destino"):
+            if st.session_state.get(k_ruta) not in opciones_ruta:
+                st.session_state[k_ruta] = None
         c1, c2 = st.columns(2)
-        c1.selectbox("Origen", activos, key="ruta_origen")
-        c2.selectbox("Destino", activos, key="ruta_destino")
+        c1.selectbox("Origen", opciones_ruta, key="ruta_origen",
+                     format_func=lambda x: "— elegir —" if x is None else x)
+        c2.selectbox("Destino", opciones_ruta, key="ruta_destino",
+                     format_func=lambda x: "— elegir —" if x is None else x)
         o, d = st.session_state.ruta_origen, st.session_state.ruta_destino
-        if o == d:
+        if o is None or d is None:
+            st.info("Elige origen y destino para calcular y resaltar una ruta en el mapa.")
+        elif o == d:
             st.warning("Selecciona dos dispositivos distintos.")
         else:
             alternativas = core.rutas_alternativas(G_sim, o, d, 3)
@@ -594,14 +612,11 @@ with tab_top:
                        file_name="enlaces_netsim.csv", mime="text/csv", use_container_width=True)
     e3.download_button("⬇️ Escenario (JSON)", json.dumps(resumen, ensure_ascii=False, indent=2),
                        file_name="escenario_netsim.json", mime="application/json", use_container_width=True)
-    archivo = st.file_uploader("Cargar una topología guardada (JSON de NetSim)", type=["json"])
-    if archivo is not None and st.button("📂 Importar topología", type="primary"):
-        try:
-            nueva = core.red_desde_dict(json.load(archivo))
-            cambiar_red(nueva)
-            st.rerun()
-        except Exception as e:  # noqa: BLE001
-            st.error(f"No se pudo importar el archivo: {e}")
+    st.file_uploader("Cargar una topología guardada (JSON de NetSim)", type=["json"], key="archivo_json")
+    st.button("📂 Importar topología", type="primary", on_click=_importar)
+    estado_import = st.session_state.pop("msg_import", None)
+    if estado_import:
+        (st.success if estado_import[0] == "ok" else st.error)(estado_import[1])
 
 st.divider()
 with st.expander("ℹ️ Acerca del simulador y sus límites"):
