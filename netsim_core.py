@@ -5,10 +5,11 @@ en la memoria del proyecto.
 """
 from __future__ import annotations
 
-from itertools import islice
+from itertools import combinations, islice
 from math import comb
 
 import networkx as nx
+import numpy as np
 import pandas as pd
 
 TIPOS = ["Router", "Switch", "Servidor", "PC", "Firewall", "Punto de acceso", "Otro"]
@@ -98,6 +99,8 @@ def red_campus() -> nx.Graph:
         ("Núcleo A", "Acceso 1", 2), ("Núcleo A", "Acceso 2", 3),
         ("Núcleo B", "Acceso 2", 2), ("Núcleo B", "Acceso 3", 3),
         ("Núcleo A", "Servidor web", 2), ("Núcleo B", "Servidor BD", 2),
+        ("Núcleo B", "Acceso 1", 3), ("Núcleo A", "Acceso 3", 3),
+        ("Núcleo B", "Servidor web", 3), ("Núcleo A", "Servidor BD", 3),
         ("Acceso 1", "AP 1", 4), ("Acceso 1", "PC 1", 5),
         ("Acceso 2", "PC 2", 4), ("Acceso 3", "PC 3", 5),
     ]
@@ -292,3 +295,130 @@ def rutas_alternativas(g: nx.Graph, origen: str, destino: str, k: int = 3):
         return []
     rutas = list(islice(nx.shortest_simple_paths(g, origen, destino, weight="weight"), k))
     return [(r, sum(g[a][b].get("weight", 1) for a, b in zip(r[:-1], r[1:]))) for r in rutas]
+
+# ---------------------------------------------------------------------------
+# Mejoras sugeridas
+# ---------------------------------------------------------------------------
+def _riesgo(g: nx.Graph) -> int:
+    """Puntos únicos de fallo + enlaces puente (menos es mejor)."""
+    return len(list(nx.articulation_points(g))) + len(list(nx.bridges(g)))
+
+
+def sugerir_enlaces(g: nx.Graph, k: int = 3, latencia: int = 5) -> list[dict]:
+    """Enlaces nuevos que más reducen los puntos únicos de fallo y los puentes.
+
+    Prueba cada pareja de dispositivos aún sin enlace y mide cuánto baja el riesgo.
+    En caso de empate prefiere enlaces entre equipos de infraestructura (se evita
+    unir dos PC entre sí, poco realista). Es una heurística, no un diseño de red.
+    """
+    if g.number_of_nodes() < 3 or not nx.is_connected(g):
+        return []
+    base = _riesgo(g)
+    if base == 0:
+        return []
+    candidatos = []
+    for u, v in combinations(sorted(g.nodes), 2):
+        if g.has_edge(u, v):
+            continue
+        if g.nodes[u].get("tipo") == "PC" and g.nodes[v].get("tipo") == "PC":
+            continue  # dos equipos finales no suelen enlazarse entre sí
+        h = g.copy()
+        h.add_edge(u, v, weight=latencia)
+        r = _riesgo(h)
+        if r < base:
+            extremos_pc = sum(g.nodes[x].get("tipo") == "PC" for x in (u, v))
+            candidatos.append({
+                "origen": u, "destino": v, "reduccion": base - r,
+                "spof_despues": len(list(nx.articulation_points(h))),
+                "puentes_despues": len(list(nx.bridges(h))),
+                "indice_despues": indice_resiliencia(h), "latencia": latencia,
+                "_pc": extremos_pc,
+            })
+    candidatos.sort(key=lambda c: (-c["reduccion"], c["spof_despues"], c["_pc"], c["origen"], c["destino"]))
+    for c in candidatos:
+        c.pop("_pc")
+    return candidatos[:k]
+
+
+# ---------------------------------------------------------------------------
+# Métricas de topología y comparación de plantillas
+# ---------------------------------------------------------------------------
+def metricas_topologia(g: nx.Graph) -> dict:
+    n, m = g.number_of_nodes(), g.number_of_edges()
+    conectada = n > 0 and nx.is_connected(g)
+    return {
+        "Dispositivos": n, "Enlaces": m,
+        "Puntos únicos de fallo": len(list(nx.articulation_points(g))) if n else 0,
+        "Enlaces puente": len(list(nx.bridges(g))) if n else 0,
+        "Índice de resiliencia (%)": round(indice_resiliencia(g), 1) if indice_resiliencia(g) is not None else None,
+        "Latencia media entre equipos (ms)": (round(nx.average_shortest_path_length(g, weight="weight"), 2)
+                                              if conectada and n > 1 else None),
+    }
+
+
+def comparar_plantillas() -> pd.DataFrame:
+    filas = [{"Topología": nombre, **metricas_topologia(f())} for nombre, f in PLANTILLAS.items()]
+    return pd.DataFrame(filas)
+
+
+# ---------------------------------------------------------------------------
+# Simulación de Monte Carlo
+# ---------------------------------------------------------------------------
+def simulacion_montecarlo(g: nx.Graph, p_nodo: float = 0.1, p_enlace: float = 0.0,
+                          n: int = 2000, seed: int = 42) -> dict | None:
+    """Repite n escenarios de fallos aleatorios independientes y mide la conectividad.
+
+    En cada ensayo cada dispositivo cae con probabilidad p_nodo y cada enlace con
+    probabilidad p_enlace. Conectividad = pares de dispositivos ACTIVOS que pueden
+    comunicarse / pares posibles entre dispositivos activos.
+    """
+    nodos, aristas = list(g.nodes), list(g.edges)
+    N = len(nodos)
+    if N == 0:
+        return None
+    rng = np.random.default_rng(seed)
+    cae_n = rng.random((n, N)) < p_nodo
+    cae_e = rng.random((n, len(aristas))) < p_enlace if aristas else np.zeros((n, 0), dtype=bool)
+    conect = np.zeros(n)
+    activos = np.zeros(n, dtype=int)
+    comps = np.zeros(n, dtype=int)
+    completa = np.zeros(n, dtype=bool)
+    indice = {nombre: i for i, nombre in enumerate(nodos)}
+    tam_comp = np.zeros((n, N), dtype=int)   # tamaño de la componente de cada dispositivo activo
+    perdidos = np.zeros(n)                   # pares activos incomunicados en cada ensayo
+    for t in range(n):
+        fn = [nodos[i] for i in np.flatnonzero(cae_n[t])]
+        fe = [aristas[j] for j in np.flatnonzero(cae_e[t])]
+        a = N - len(fn)
+        activos[t] = a
+        if a == 0:
+            continue
+        tams = []
+        for comp in nx.connected_components(nx.restricted_view(g, fn, fe)):
+            tams.append(len(comp))
+            for nodo in comp:
+                tam_comp[t, indice[nodo]] = len(comp)
+        comps[t] = len(tams)
+        total = a * (a - 1) // 2
+        conectados = sum(k * (k - 1) // 2 for k in tams)
+        perdidos[t] = total - conectados
+        conect[t] = 1.0 if total == 0 else conectados / total
+        completa[t] = len(tams) == 1
+    impacto = []
+    for i, nombre in enumerate(nodos):
+        cae = cae_n[:, i]
+        if cae.sum() >= 5 and (~cae).sum() >= 5:
+            # Pares incomunicados SIN contar los que involucran a este dispositivo, para
+            # compararlos de forma justa cuando está caído y cuando está activo.
+            ajenos_ok = perdidos[~cae] - (activos[~cae] - tam_comp[~cae, i])
+            ajenos_caido = perdidos[cae]
+            impacto.append({"Dispositivo": nombre, "Tipo": g.nodes[nombre].get("tipo", "Otro"),
+                            "Veces caído": int(cae.sum()),
+                            "Pares ajenos incomunicados al caer": round(float(ajenos_caido.mean() - ajenos_ok.mean()), 2)})
+    return {
+        "n": n, "conectividad": conect, "completa": completa, "componentes": comps, "activos": activos,
+        "p_completa": float(completa.mean()), "conect_media": float(conect.mean()),
+        "comp_medios": float(comps.mean()), "activos_medios": float(activos.mean()),
+        "impacto": pd.DataFrame(impacto).sort_values("Pares ajenos incomunicados al caer", ascending=False)
+        .reset_index(drop=True) if impacto else pd.DataFrame(),
+    }
