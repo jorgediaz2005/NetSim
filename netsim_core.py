@@ -9,7 +9,6 @@ from itertools import combinations, islice
 from math import comb
 
 import networkx as nx
-import numpy as np
 import pandas as pd
 
 TIPOS = ["Router", "Switch", "Servidor", "PC", "Firewall", "Punto de acceso", "Otro"]
@@ -359,66 +358,3 @@ def metricas_topologia(g: nx.Graph) -> dict:
 def comparar_plantillas() -> pd.DataFrame:
     filas = [{"Topología": nombre, **metricas_topologia(f())} for nombre, f in PLANTILLAS.items()]
     return pd.DataFrame(filas)
-
-
-# ---------------------------------------------------------------------------
-# Simulación de Monte Carlo
-# ---------------------------------------------------------------------------
-def simulacion_montecarlo(g: nx.Graph, p_nodo: float = 0.1, p_enlace: float = 0.0,
-                          n: int = 2000, seed: int = 42) -> dict | None:
-    """Repite n escenarios de fallos aleatorios independientes y mide la conectividad.
-
-    En cada ensayo cada dispositivo cae con probabilidad p_nodo y cada enlace con
-    probabilidad p_enlace. Conectividad = pares de dispositivos ACTIVOS que pueden
-    comunicarse / pares posibles entre dispositivos activos.
-    """
-    nodos, aristas = list(g.nodes), list(g.edges)
-    N = len(nodos)
-    if N == 0:
-        return None
-    rng = np.random.default_rng(seed)
-    cae_n = rng.random((n, N)) < p_nodo
-    cae_e = rng.random((n, len(aristas))) < p_enlace if aristas else np.zeros((n, 0), dtype=bool)
-    conect = np.zeros(n)
-    activos = np.zeros(n, dtype=int)
-    comps = np.zeros(n, dtype=int)
-    completa = np.zeros(n, dtype=bool)
-    indice = {nombre: i for i, nombre in enumerate(nodos)}
-    tam_comp = np.zeros((n, N), dtype=int)   # tamaño de la componente de cada dispositivo activo
-    perdidos = np.zeros(n)                   # pares activos incomunicados en cada ensayo
-    for t in range(n):
-        fn = [nodos[i] for i in np.flatnonzero(cae_n[t])]
-        fe = [aristas[j] for j in np.flatnonzero(cae_e[t])]
-        a = N - len(fn)
-        activos[t] = a
-        if a == 0:
-            continue
-        tams = []
-        for comp in nx.connected_components(nx.restricted_view(g, fn, fe)):
-            tams.append(len(comp))
-            for nodo in comp:
-                tam_comp[t, indice[nodo]] = len(comp)
-        comps[t] = len(tams)
-        total = a * (a - 1) // 2
-        conectados = sum(k * (k - 1) // 2 for k in tams)
-        perdidos[t] = total - conectados
-        conect[t] = 1.0 if total == 0 else conectados / total
-        completa[t] = len(tams) == 1
-    impacto = []
-    for i, nombre in enumerate(nodos):
-        cae = cae_n[:, i]
-        if cae.sum() >= 5 and (~cae).sum() >= 5:
-            # Pares incomunicados SIN contar los que involucran a este dispositivo, para
-            # compararlos de forma justa cuando está caído y cuando está activo.
-            ajenos_ok = perdidos[~cae] - (activos[~cae] - tam_comp[~cae, i])
-            ajenos_caido = perdidos[cae]
-            impacto.append({"Dispositivo": nombre, "Tipo": g.nodes[nombre].get("tipo", "Otro"),
-                            "Veces caído": int(cae.sum()),
-                            "Pares ajenos incomunicados al caer": round(float(ajenos_caido.mean() - ajenos_ok.mean()), 2)})
-    return {
-        "n": n, "conectividad": conect, "completa": completa, "componentes": comps, "activos": activos,
-        "p_completa": float(completa.mean()), "conect_media": float(conect.mean()),
-        "comp_medios": float(comps.mean()), "activos_medios": float(activos.mean()),
-        "impacto": pd.DataFrame(impacto).sort_values("Pares ajenos incomunicados al caer", ascending=False)
-        .reset_index(drop=True) if impacto else pd.DataFrame(),
-    }
