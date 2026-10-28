@@ -417,11 +417,6 @@ def _sugerencias(clave):
     return core.sugerir_enlaces(core.red_desde_dict(json.loads(clave)), 3)
 
 
-@st.cache_data(show_spinner="Simulando miles de escenarios de fallo…")
-def _montecarlo(clave, p_nodo, p_enlace, n, semilla):
-    return core.simulacion_montecarlo(core.red_desde_dict(json.loads(clave)), p_nodo, p_enlace, n, semilla)
-
-
 @st.cache_data(show_spinner=False)
 def _plantillas():
     return core.comparar_plantillas()
@@ -862,9 +857,8 @@ def generar_informe():
         '<p class="nota">Consejo: imprime esta página (Ctrl + P) para guardarla como PDF.</p></body></html>')
 
 
-tab_red, tab_rutas, tab_crit, tab_res, tab_mc, tab_ml, tab_top = st.tabs([
-    "🗺️ Mapa", "🧭 Rutas", "🚦 Criticidad", "🛡️ Resiliencia", "🎲 Monte Carlo", "🤖 Machine Learning",
-    "📋 Topología y exportación"])
+tab_red, tab_rutas, tab_crit, tab_res, tab_ml, tab_top = st.tabs([
+    "🗺️ Mapa", "🧭 Rutas", "🚦 Criticidad", "🛡️ Resiliencia", "🤖 Machine Learning", "📋 Topología y exportación"])
 
 # ---------------------------------------------------------
 with tab_red:
@@ -1115,80 +1109,6 @@ with tab_res:
 
 
 # ---------------------------------------------------------
-with tab_mc:
-    seccion("🎲 Simulación de Monte Carlo: disponibilidad esperada")
-    st.write("Provoca miles de escenarios de fallos **aleatorios e independientes** y mide qué tan bien resiste la "
-             "red. Cada dispositivo y cada enlace cae con la probabilidad que indiques.")
-    if G.number_of_nodes() < 2:
-        st.info("Añade al menos dos dispositivos para simular.")
-    else:
-        cp1, cp2, cp3, cp4 = st.columns(4)
-        p_nodo = cp1.slider("Fallo por dispositivo (%)", 0, 50, 10, key="mc_pn") / 100
-        p_enl = cp2.slider("Fallo por enlace (%)", 0, 50, 5, key="mc_pe") / 100
-        n_mc = cp3.select_slider("Número de ensayos", [500, 1000, 2000, 5000, 10000], value=2000, key="mc_n")
-        semilla = cp4.number_input("Semilla aleatoria", 0, 99999, 42, key="mc_seed")
-        mc = _montecarlo(clave_red, p_nodo, p_enl, int(n_mc), int(semilla))
-
-        def tono_pct(v):
-            return "ok" if v >= 0.9 else ("warn" if v >= 0.7 else "bad")
-
-        q1, q2, q3, q4 = st.columns(4)
-        q1.markdown(kpi("📶", "Conectividad media", f"{mc['conect_media'] * 100:.1f} %",
-                        "Pares activos que se comunican", tono_pct(mc["conect_media"])), unsafe_allow_html=True)
-        q2.markdown(kpi("🔗", "Red totalmente conectada", f"{mc['p_completa'] * 100:.1f} %",
-                        "Ensayos sin fragmentación", tono_pct(mc["p_completa"])), unsafe_allow_html=True)
-        q3.markdown(kpi("🧩", "Componentes medios", f"{mc['comp_medios']:.2f}", "1.00 = red siempre unida",
-                        "ok" if mc["comp_medios"] <= 1.05 else "warn"), unsafe_allow_html=True)
-        q4.markdown(kpi("🖥️", "Dispositivos activos medios", f"{mc['activos_medios']:.1f}/{G.number_of_nodes()}",
-                        "Promedio por ensayo", "info"), unsafe_allow_html=True)
-        st.write("")
-        h1, h2 = st.columns(2)
-        with h1:
-            seccion("Distribución de la conectividad")
-            conteo, _ = np.histogram(mc["conectividad"], bins=np.linspace(0, 1, 11))
-            etiquetas_bin = [f"{i * 10}–{i * 10 + 10} %" for i in range(10)]
-            fig = go.Figure(go.Bar(
-                x=etiquetas_bin, y=100 * conteo / mc["n"], text=[f"{v:.0f}%" for v in 100 * conteo / mc["n"]],
-                textposition="outside", marker=dict(color=[COLORES["Alta"]] * 5 + [COLORES["Media"]] * 3 +
-                                                    [COLORES["Baja"]] * 2)))
-            estilo_fig(fig, alto=320, margen=dict(l=10, r=10, t=30, b=10))
-            fig.update_layout(yaxis=dict(title="% de ensayos", gridcolor="rgba(255,255,255,.06)"),
-                              xaxis=dict(title="Conectividad entre dispositivos activos"))
-            mostrar(fig)
-        with h2:
-            seccion("Número de componentes por ensayo")
-            cuenta_comp = np.bincount(mc["componentes"])
-            fig = go.Figure(go.Bar(
-                x=["Sin equipos" if k == 0 else (f"{k} grupo" if k == 1 else f"{k} grupos")
-                   for k in range(len(cuenta_comp))],
-                y=100 * cuenta_comp / mc["n"], text=[f"{v:.1f}%" for v in 100 * cuenta_comp / mc["n"]],
-                textposition="outside", marker=dict(color=C_ACENTO)))
-            estilo_fig(fig, alto=320, margen=dict(l=10, r=10, t=30, b=10))
-            fig.update_layout(yaxis=dict(title="% de ensayos", gridcolor="rgba(255,255,255,.06)"))
-            mostrar(fig)
-        impacto = mc["impacto"]
-        seccion("Dispositivos que más daño causan al caer")
-        if impacto.empty:
-            st.info("Aumenta la probabilidad de fallo o el número de ensayos para estimar el impacto de cada equipo.")
-        else:
-            impacto = impacto.copy()
-            col_imp = "Pares ajenos incomunicados al caer"
-            impacto[col_imp] = impacto[col_imp].clip(lower=0)
-            peor = impacto.iloc[0]
-            if peor[col_imp] > 0:
-                st.info(f"Según la simulación, el dispositivo más dañino al caer es **{peor['Dispositivo']}**: "
-                        f"deja sin comunicación, en promedio, a **{peor[col_imp]:.1f} pares** de otros equipos.")
-            orden = impacto.sort_values(col_imp)
-            fig = go.Figure(go.Bar(x=orden[col_imp], y=orden["Dispositivo"], orientation="h",
-                                   marker=dict(color=C_ACENTO2), text=orden[col_imp], textposition="outside"))
-            estilo_fig(fig, alto=max(260, 36 * len(orden)), margen=dict(l=10, r=40, t=10, b=10))
-            fig.update_layout(xaxis=dict(title="Pares de otros equipos incomunicados (promedio)",
-                                         gridcolor="rgba(255,255,255,.06)"))
-            mostrar(fig)
-            st.dataframe(impacto, use_container_width=True, hide_index=True)
-        st.caption("Modelo simplificado: los fallos son independientes y no hay fallos en cadena, reparaciones ni "
-                   "tráfico. Sirve para comparar topologías, no para predecir la disponibilidad de una red real.")
-
 # ---------------------------------------------------------
 @st.cache_data(show_spinner=False)
 def entrenar_modelo():
