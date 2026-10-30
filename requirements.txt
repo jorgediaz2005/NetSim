@@ -1,0 +1,9 @@
+# Versión exacta: las animaciones y el cierre de menús (netsim_js) se prueban contra el DOM de
+# esta versión; con ">=1.35" el despliegue instala la última y el JavaScript puede dejar de encajar.
+streamlit==1.66.1
+networkx>=3.2
+plotly>=5.20
+pandas>=2.0
+numpy>=1.26
+scipy>=1.11
+scikit-learn>=1.4
