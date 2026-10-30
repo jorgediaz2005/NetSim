@@ -45,6 +45,11 @@ SIMBOLOS = {
 
 COLORES = {"Baja": "#2ECC71", "Media": "#F5A623", "Alta": "#FF4D4F"}
 
+# Fórmula de criticidad: PESO_GRADO * grado + PESO_INTERMEDIACION * intermediación + PESO_TIPO * tipo
+PESO_GRADO = 0.35
+PESO_INTERMEDIACION = 0.35
+PESO_TIPO = 0.30
+
 UMBRAL_MEDIA = 0.30
 UMBRAL_ALTA = 0.60
 
@@ -161,7 +166,7 @@ def red_desde_dict(datos: dict) -> nx.Graph:
 
 
 # ---------------------------------------------------------------------------
-# Simulación y métricas
+# Simulación de fallos
 # ---------------------------------------------------------------------------
 def simular(g: nx.Graph, nodos_fallidos, enlaces_fallidos) -> nx.Graph:
     s = g.copy()
@@ -195,6 +200,9 @@ def pares_incomunicados(original: nx.Graph, simulada: nx.Graph) -> list[tuple[st
     return out
 
 
+# ---------------------------------------------------------------------------
+# Criticidad de dispositivos
+# ---------------------------------------------------------------------------
 def nivel(score: float) -> str:
     return "Baja" if score < UMBRAL_MEDIA else ("Media" if score < UMBRAL_ALTA else "Alta")
 
@@ -215,7 +223,7 @@ def criticidad_dispositivos(g: nx.Graph) -> pd.DataFrame:
     filas = []
     for n, a in g.nodes(data=True):
         imp = PESOS_TIPO.get(a.get("tipo", "Otro"), 0.40)
-        score = 0.35 * grado[n] + 0.35 * inter[n] + 0.30 * imp
+        score = PESO_GRADO * grado[n] + PESO_INTERMEDIACION * inter[n] + PESO_TIPO * imp
         nv = nivel(score)
         filas.append({
             "Dispositivo": n, "Tipo": a.get("tipo", "Otro"), "Conexiones": int(g.degree[n]),
@@ -226,6 +234,17 @@ def criticidad_dispositivos(g: nx.Graph) -> pd.DataFrame:
         })
     return (pd.DataFrame(filas).sort_values(["Puntuación", "Dispositivo"], ascending=[False, True])
             .reset_index(drop=True))
+
+
+# ---------------------------------------------------------------------------
+# Resiliencia: puntos únicos de fallo, puentes e impacto de cada caída
+# ---------------------------------------------------------------------------
+def _n_spof(g: nx.Graph) -> int:
+    return sum(1 for _ in nx.articulation_points(g))
+
+
+def _n_puentes(g: nx.Graph) -> int:
+    return sum(1 for _ in nx.bridges(g))
 
 
 def impacto_dispositivos(g: nx.Graph) -> pd.DataFrame:
@@ -281,6 +300,9 @@ def indice_resiliencia(g: nx.Graph) -> float | None:
     return 100.0 * (1 - len(arts) / g.number_of_nodes())
 
 
+# ---------------------------------------------------------------------------
+# Latencias y rutas
+# ---------------------------------------------------------------------------
 def matriz_latencias(g: nx.Graph) -> pd.DataFrame:
     nodos = sorted(g.nodes())
     dist = dict(nx.all_pairs_dijkstra_path_length(g, weight="weight"))
@@ -295,12 +317,13 @@ def rutas_alternativas(g: nx.Graph, origen: str, destino: str, k: int = 3):
     rutas = list(islice(nx.shortest_simple_paths(g, origen, destino, weight="weight"), k))
     return [(r, sum(g[a][b].get("weight", 1) for a, b in zip(r[:-1], r[1:]))) for r in rutas]
 
+
 # ---------------------------------------------------------------------------
 # Mejoras sugeridas
 # ---------------------------------------------------------------------------
 def _riesgo(g: nx.Graph) -> int:
     """Puntos únicos de fallo + enlaces puente (menos es mejor)."""
-    return len(list(nx.articulation_points(g))) + len(list(nx.bridges(g)))
+    return _n_spof(g) + _n_puentes(g)
 
 
 def sugerir_enlaces(g: nx.Graph, k: int = 3, latencia: int = 5) -> list[dict]:
@@ -328,8 +351,8 @@ def sugerir_enlaces(g: nx.Graph, k: int = 3, latencia: int = 5) -> list[dict]:
             extremos_pc = sum(g.nodes[x].get("tipo") == "PC" for x in (u, v))
             candidatos.append({
                 "origen": u, "destino": v, "reduccion": base - r,
-                "spof_despues": len(list(nx.articulation_points(h))),
-                "puentes_despues": len(list(nx.bridges(h))),
+                "spof_despues": _n_spof(h),
+                "puentes_despues": _n_puentes(h),
                 "indice_despues": indice_resiliencia(h), "latencia": latencia,
                 "_pc": extremos_pc,
             })
@@ -345,11 +368,12 @@ def sugerir_enlaces(g: nx.Graph, k: int = 3, latencia: int = 5) -> list[dict]:
 def metricas_topologia(g: nx.Graph) -> dict:
     n, m = g.number_of_nodes(), g.number_of_edges()
     conectada = n > 0 and nx.is_connected(g)
+    indice = indice_resiliencia(g)
     return {
         "Dispositivos": n, "Enlaces": m,
-        "Puntos únicos de fallo": len(list(nx.articulation_points(g))) if n else 0,
-        "Enlaces puente": len(list(nx.bridges(g))) if n else 0,
-        "Índice de resiliencia (%)": round(indice_resiliencia(g), 1) if indice_resiliencia(g) is not None else None,
+        "Puntos únicos de fallo": _n_spof(g) if n else 0,
+        "Enlaces puente": _n_puentes(g) if n else 0,
+        "Índice de resiliencia (%)": round(indice, 1) if indice is not None else None,
         "Latencia media entre equipos (ms)": (round(nx.average_shortest_path_length(g, weight="weight"), 2)
                                               if conectada and n > 1 else None),
     }
