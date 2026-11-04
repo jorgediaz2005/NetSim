@@ -122,9 +122,9 @@ Antes de instalar conviene comprobar que la descarga llegó intacta. En PowerShe
 Get-FileHash -Algorithm SHA256 .\NetSim-1.0-Instalador.exe
 ```
 
-Debe devolver `e6c47a0b8bbdbb35b5f872394c8f54996311394bc23b36cc3ca8afb703e11c28`. Si no coincide, el fichero se ha corrompido o sustituido en el trayecto: no instalarlo.
+El valor oficial es el de la línea **SHA-256** de la [nota del release v1.0](https://github.com/jorgediaz2005/NetSim/releases/tag/v1.0), que es donde se consulta antes de instalar. Aquí no se imprime la cadena porque este README viaja dentro del instalador y ningún instalador puede llevar escrito su propio SHA-256; si el hash no coincide con el de la nota, el fichero se ha corrompido o sustituido en el trayecto: no instalarlo.
 
-Para construirlo uno mismo (una recompilación produce un binario distinto, así que el hash de arriba ya no aplica y hay que recalcularlo con `sha256sum NetSim-1.0-Instalador.exe > SHA256SUMS`):
+Para construirlo uno mismo (una recompilación produce un binario distinto, así que después hay que recalcular el valor publicado con `cd dist && sha256sum NetSim-1.0-Instalador.exe > SHA256SUMS` y actualizar la línea SHA-256 de la nota del release):
 
 ```bash
 python -m pip install pyinstaller pywebview
