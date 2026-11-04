@@ -23,7 +23,6 @@ import netsim_core as core
 import netsim_edu as edu
 import netsim_informe
 import netsim_js
-import netsim_ml
 from netsim_core import ICONOS, PLANTILLAS, SIMBOLOS, TIPOS
 from netsim_estilos import ARTE_HERO, colapsar_html, css_completo, esc, rgba
 
@@ -294,6 +293,9 @@ def _plantillas():
 
 @st.cache_data(show_spinner=False)
 def _modelo_ml():
+    # Dentro, no arriba: traer sklearn cuesta ~1,4 s y solo hace falta en la pestaña de
+    # Aprendizaje automático. Como quien no entra ahí no lo paga, el arranque no lo carga.
+    import netsim_ml
     return netsim_ml.entrenar_modelo()
 
 

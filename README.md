@@ -108,6 +108,10 @@ NetSim también se empaqueta como programa con ventana propia, sin pestaña de n
 
 Arranque y registro del servidor: `%LOCALAPPDATA%\NetSim\` (`servidor.log` y `error.log`). El ejecutable se congela sin consola, así que un fallo de arranque solo se ve ahí.
 
+El arranque mide ~2,4 s hasta los primeros controles y ~3,9 s hasta la página completa (doble clic → ventana pintada, con la caché de disco caliente; el primer arranque tras encender el equipo añade un par de segundos). Lo que manda es importar: `streamlit`+`pandas`+`networkx` salen del paso y no hay forma de quitárselos, pero `sklearn` (la pestaña de Aprendizaje automático) se carga dentro de `_modelo_ml()`, no arriba, porque costaba ~1,4 s en cada arranque aunque nadie abriera esa pestaña. El grafo, en cambio, no pesa nada: todos los cálculos de `netsim_core` sobre la red de ejemplo quedan por debajo de 10 ms.
+
+Cosas que se probaron y **no** mejoraron nada medible: perfiles persistentes de WebView2 (`private_mode=False` con `storage_path`) para que la caché del navegador conservara los ~12 MB de JS de Streamlit — 5,50-5,69 s frente a 5,48-5,63 s del modo privado, es decir, igual; localhost es demasiado rápido para que esa caché se note.
+
 ## 11. Instalador para repartir
 
 ```bash
