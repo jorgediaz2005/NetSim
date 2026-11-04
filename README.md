@@ -131,3 +131,15 @@ Cosas a tener en cuenta al repartirlo:
 - Necesita Windows 10 u 11 de 64 bits y el entorno WebView2 (viene con las actualizaciones de Edge). No hace falta instalar Python ni tener internet.
 - La primera pantalla puede tardar unos segundos: el servidor arranca en local.
 
+
+## 12. Licencia y autoría
+
+NetSim (código y materiales de aprendizaje) es obra de **jorgediaz2005** y está publicado bajo **Creative Commons Atribución-UsoNoComercial-CompartirIgual 4.0 Internacional (CC BY-NC-SA 4.0)**. El texto legal completo está en el fichero `LICENSE`.
+
+En términos prácticos, quién recibe NetSim puede:
+
+- **Usarlo y adaptarlo para docencia o estudio**, citando la autoría (enlazando a este repositorio es suficiente).
+- **Compartir versiones modificadas** solo sin uso comercial y manteniendo la misma licencia.
+- No puede revenderlo, incorporarlo a un producto comercial ni presentar el material como propio.
+
+El código viaja en texto plano tanto en este repositorio como dentro de la carpeta `_internal\NetSim\` del programa de escritorio, así que la licencia es la que regula qué se puede hacer con él.
