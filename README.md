@@ -114,6 +114,18 @@ Cosas que se probaron y **no** mejoraron nada medible: perfiles persistentes de 
 
 ## 11. Instalador para repartir
 
+**Descarga directa:** [NetSim-1.0-Instalador.exe](https://github.com/jorgediaz2005/NetSim/releases/download/v1.0/NetSim-1.0-Instalador.exe) (135 MB), adjunto al [release v1.0](https://github.com/jorgediaz2005/NetSim/releases/tag/v1.0). Es el camino normal para repartir: se pasa el enlace y cada equipo instala sin compilar nada.
+
+Antes de instalar conviene comprobar que la descarga llegó intacta. En PowerShell, desde la carpeta del fichero:
+
+```powershell
+Get-FileHash -Algorithm SHA256 .\NetSim-1.0-Instalador.exe
+```
+
+Debe devolver `21d774b433d9950df0a7c6d529ff05011971133156ce3c45ce45eda1c73148de`. Si no coincide, el fichero se ha corrompido o sustituido en el trayecto: no instalarlo.
+
+Para construirlo uno mismo (una recompilación produce un binario distinto, así que el hash de arriba ya no aplica y hay que recalcularlo con `sha256sum NetSim-1.0-Instalador.exe > SHA256SUMS`):
+
 ```bash
 python -m pip install pyinstaller pywebview
 winget install JRSoftware.InnoSetup
