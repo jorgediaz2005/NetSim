@@ -1,0 +1,14 @@
+[theme]
+# Modo día por defecto: estos valores son los que pinta Streamlit antes de aplicar netsim_estilos.
+base = "light"
+primaryColor = "#2563EB"
+backgroundColor = "#F3F6FB"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#0F172A"
+
+[browser]
+gatherUsageStats = false
+
+[client]
+# Sin barra superior: Stop, Deploy y el menú ⋮ no aportan nada a quien usa el laboratorio.
+toolbarMode = "minimal"
