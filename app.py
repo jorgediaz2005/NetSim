@@ -92,7 +92,8 @@ LAT_LENTO = 6    # ms: enlaces lentos
 ANCHO_ENLACE = {"rapido": 3.2, "medio": 2.4, "lento": 1.8}
 
 
-# El resto de la interfaz sí se resuelve solo con CSS (tema día/noche en netsim_estilos).
+# El resto de la interfaz se resuelve solo con CSS (tema día/noche y la barra superior oculta,
+# ambas cosas en netsim_estilos).
 st.markdown(css_completo(MODO_DIA), unsafe_allow_html=True)
 
 
