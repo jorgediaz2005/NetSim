@@ -53,6 +53,9 @@ CSS_BASE = """
 html, body {background: var(--bg) !important; color: var(--text) !important;}
 [data-testid="stAppViewContainer"], [data-testid="stMain"], [data-testid="stSidebarContent"] {background: transparent !important;}
 .block-container {padding-top: 1.1rem; padding-bottom: 2.5rem; max-width: 1500px;}
+/* «Stop/Deploy/⋮» los quita client.toolbarMode=minimal; Streamlit Cloud añade además «Fork» y
+   «source» por su cuenta y minimal no los toca porque los inyecta la plataforma. */
+[data-testid="stToolbar"] {display: none !important;}
 #MainMenu, footer {visibility: hidden;}
 header[data-testid="stHeader"] {background: transparent;}
 header[data-testid="stHeader"] *, [data-testid="stSidebarCollapseButton"] *, [data-testid="stExpandSidebarButton"] * {color: var(--text) !important;}
