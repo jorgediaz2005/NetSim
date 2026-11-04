@@ -1026,12 +1026,12 @@ def pestana_topologia():
 
 
 def pestana_aprende():
-    """Lecciones, topologías, retos, glosario y test."""
+    """Lecciones, topologías, retos, glosario y autoevaluación."""
     seccion("Material de aprendizaje")
     st.write(f"Material dirigido a {edu.PUBLICO}. Puede seguir el orden propuesto o consultar la lección "
              "que necesite; cada una termina con una práctica **en la app**.")
     sub_lec, sub_top, sub_ret, sub_glo, sub_quiz = st.tabs(
-        ["Lecciones", "Topologías", "Retos", "Glosario", "Test"])
+        ["Lecciones", "Topologías", "Retos", "Glosario", "Autoevaluación"])
     clase_nivel = {"Principiante": "ok", "Intermedio": "warn", "Avanzado": "bad"}
 
     with sub_lec:

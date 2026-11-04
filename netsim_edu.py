@@ -1,6 +1,6 @@
 """Contenido educativo y de ayuda de NetSim.
 
-Aquí viven SOLO los textos y datos (lecciones, glosario, retos, test, ayuda).
+Aquí viven SOLO los textos y datos (lecciones, glosario, retos, autoevaluación, ayuda).
 La interfaz (app.py) los dibuja; así se pueden ampliar o corregir sin tocar código.
 
 Público objetivo: estudiantes de iniciación a redes e informática (ciclos formativos
