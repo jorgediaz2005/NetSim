@@ -86,7 +86,7 @@ Resiliencia: un *punto único de fallo* es un punto de articulación del grafo; 
 - `netsim_estilos.py`: temas día/noche y hojas CSS.
 - `netsim_js.py`: animaciones e interacción inyectadas en el navegador.
 - `netsim_informe.py`: informe HTML imprimible del escenario.
-- `.streamlit/config.toml`: tema por defecto (modo día), estadísticas desactivadas y `toolbarMode = "minimal"` (sin Stop, Deploy ni menú ⋮ arriba a la derecha).
+- `.streamlit/config.toml`: tema por defecto (modo día), estadísticas desactivadas y `toolbarMode = "minimal"` (sin Stop, Deploy ni menú ⋮ arriba a la derecha). Streamlit Cloud añade además sus botones «Fork» y «source», que `minimal` no toca porque los inyecta la plataforma; esos dos los oculta la regla `[data-testid="stToolbar"]` de `netsim_estilos.py`.
 - `requirements.txt`: dependencias.
 - `iniciar_netsim.bat`: inicio rápido en Windows (abre el navegador).
 - `escritorio/`: lanzador, spec de PyInstaller, icono, script de construcción y guion del instalador (`NetSim.iss`).
@@ -94,6 +94,8 @@ Resiliencia: un *punto único de fallo* es un punto de articulación del grafo; 
 ## 9. Despliegue web
 
 En Streamlit Cloud o Render, sube la carpeta tal cual (incluida `.streamlit/`) y señala `app.py` como punto de entrada. `requirements.txt` fija `streamlit==1.66.1` a propósito: las animaciones de `netsim_js.py` se probaron contra el DOM de esa versión y una actualización puede descolgarlas.
+
+Render se reconstruye solo con cada push. Streamlit Cloud no siempre: si el cambio va solo en un módulo (`netsim_estilos.py`, `netsim_edu.py`…) puede seguir sirviendo la imagen anterior, y el «Reboot» tampoco vuelve a leer el repo. En ese caso, desde el panel de la app: **Manage app → Redeploy → Clear cache and redeploy**.
 
 ## 10. Versión de escritorio (Windows)
 
