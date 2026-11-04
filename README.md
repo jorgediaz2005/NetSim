@@ -134,7 +134,7 @@ Cosas a tener en cuenta al repartirlo:
 
 ## 12. Licencia y autoría
 
-NetSim (código y materiales de aprendizaje) es obra de **jorgediaz2005** y está publicado bajo **Creative Commons Atribución-UsoNoComercial-CompartirIgual 4.0 Internacional (CC BY-NC-SA 4.0)**. El texto legal completo está en el fichero `LICENSE`.
+NetSim (código y materiales de aprendizaje) es obra de **jorgediaz2005** y está publicado bajo **Creative Commons Atribución-UsoNoComercial-CompartirIgual 4.0 Internacional (CC BY-NC-SA 4.0)** — identificador SPDX: `CC-BY-NC-SA-4.0`. El texto legal completo está en el fichero `LICENSE`.
 
 En términos prácticos, quién recibe NetSim puede:
 
