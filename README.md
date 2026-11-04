@@ -122,7 +122,7 @@ Antes de instalar conviene comprobar que la descarga llegó intacta. En PowerShe
 Get-FileHash -Algorithm SHA256 .\NetSim-1.0-Instalador.exe
 ```
 
-Debe devolver `21d774b433d9950df0a7c6d529ff05011971133156ce3c45ce45eda1c73148de`. Si no coincide, el fichero se ha corrompido o sustituido en el trayecto: no instalarlo.
+Debe devolver `e6c47a0b8bbdbb35b5f872394c8f54996311394bc23b36cc3ca8afb703e11c28`. Si no coincide, el fichero se ha corrompido o sustituido en el trayecto: no instalarlo.
 
 Para construirlo uno mismo (una recompilación produce un binario distinto, así que el hash de arriba ya no aplica y hay que recalcularlo con `sha256sum NetSim-1.0-Instalador.exe > SHA256SUMS`):
 
