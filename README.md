@@ -95,7 +95,7 @@ Resiliencia: un *punto único de fallo* es un punto de articulación del grafo; 
 
 En Streamlit Cloud o Render, sube la carpeta tal cual (incluida `.streamlit/`) y señala `app.py` como punto de entrada. `requirements.txt` fija `streamlit==1.66.1` a propósito: las animaciones de `netsim_js.py` se probaron contra el DOM de esa versión y una actualización puede descolgarlas.
 
-Render se reconstruye solo con cada push. Streamlit Cloud no siempre: si el cambio va solo en un módulo (`netsim_estilos.py`, `netsim_edu.py`…) puede seguir sirviendo la imagen anterior, y el «Reboot» tampoco vuelve a leer el repo. En ese caso, desde el panel de la app: **Manage app → Redeploy → Clear cache and redeploy**.
+Render se reconstruye solo con cada push. Streamlit Cloud también lo detecta (en el registro pone `🐙 Pulling code changes from Github…` y `🔄 Updated app!`), pero **no reinicia el proceso** que está sirviendo la app, así que sigue usando el código que cargó al arrancar. Para forzarlo: en el panel de `share.streamlit.io`, abre el menú ⋮ de la tarjeta y pulsa **Reboot** — ese sí vuelve a clonar el repo y levanta un proceso nuevo (tarda alrededor de minuto y medio, y corta las sesiones abiertas).
 
 ## 10. Versión de escritorio (Windows)
 
